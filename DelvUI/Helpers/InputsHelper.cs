@@ -41,7 +41,6 @@ namespace DelvUI.Helpers
     public unsafe class InputsHelper : IDisposable
     {
         public delegate void OnSetUIMouseoverActor(long arg1, long arg2);
-        private delegate bool UseActionDelegate(IntPtr manager, ActionType actionType, uint actionId, GameObjectID targetId, uint a4, uint a5, uint a6, IntPtr a7);
 
         #region Singleton
         private InputsHelper()
@@ -62,17 +61,6 @@ namespace DelvUI.Helpers
             catch
             {
                 PluginLog.Error("InputsHelper OnSetUIMouseoverActor Hook failed!!!");
-            }
-
-            try
-            {
-                IntPtr ptr = Plugin.SigScanner.ScanText(ActionManager.Addresses.UseAction.String);
-                _requestActionHook = Hook<UseActionDelegate>.FromAddress(ptr, HandleRequestAction);
-                _requestActionHook?.Enable();
-            }
-            catch
-            {
-                PluginLog.Error("InputsHelper UseActionDelegate Hook failed!!!");
             }
 
             // mouseover setting
@@ -107,9 +95,6 @@ namespace DelvUI.Helpers
             _uiMouseOverActorHook?.Disable();
             _uiMouseOverActorHook?.Dispose();
 
-            _requestActionHook?.Disable();
-            _requestActionHook?.Dispose();
-
             // give imgui the control of inputs again
             if (_wndHandle != IntPtr.Zero && _imguiWndProcPtr != IntPtr.Zero)
             {
@@ -124,8 +109,6 @@ namespace DelvUI.Helpers
 
         private IntPtr _setUIMouseOverActor;
         private Hook<OnSetUIMouseoverActor>? _uiMouseOverActorHook;
-
-        private Hook<UseActionDelegate>? _requestActionHook;
 
         private ExcelSheet<Action>? _sheet;
 
@@ -191,15 +174,14 @@ namespace DelvUI.Helpers
         private bool HandleRequestAction(IntPtr manager, ActionType actionType, uint actionId, GameObjectID targetId, uint a4, uint a5,
                                           uint a6, IntPtr a7)
         {
-            if (_requestActionHook == null) { return false; }
 
             if (_config.MouseoverEnabled && _config.MouseoverAutomaticMode && IsActionValid(actionId, _target) && !_ignoringMouseover)
             {
                 GameObjectID target = new() { ObjectID = _target!.ObjectId };
-                return _requestActionHook.Original(manager, actionType, actionId, target, a4, a5, a6, a7);
+                return false;
             }
 
-            return _requestActionHook.Original(manager, actionType, actionId, targetId, a4, a5, a6, a7);
+            return false;
         }
 
         private bool IsActionValid(ulong actionID, GameObject? target)
