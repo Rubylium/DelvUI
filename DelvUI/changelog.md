@@ -1,3 +1,14 @@
+# 1.6.1.0
+- Added a new "Occlusion Type" setting for Nameplates:
+    + This lets you control which kind of objects in the world will cover nameplates.
+    + This setting's default value is "Walls".
+    + In previous versions, the default was "Walls and Objects" which was causing a lot of unexpected behaviors.
+
+- Fixed released minions in the Island Sanctuary not having a nameplate.
+- Fixed elements in the enemies nameplates not being visible if both the Health Bar and Name Label were hidden.
+- Fixed some game windows not covering DelvUI elements.
+- Fixed Status Lists layout not being calculated correctly with high padding.
+
 # 1.6.0.1
 - Added "Disable Interaction" setting to Nameplates' Health Bars.
 - Fixed Nameplates eating mouse inputs even when their Health Bars are not visible.
