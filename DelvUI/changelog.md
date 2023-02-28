@@ -1,3 +1,12 @@
+# 1.6.2.1
+- Fixed Nameplates special Window Clipping settings affecting other elements.
+- Fixed Default Target Castbar setting not working properly.
+
+# 1.6.2.0
+- Added Window Clipping settings to enable some special behaviors for Nameplates.
+- Fixed the game's focus target UI clipping DelvUI elements.
+- Fixed Duty Finder window not clipping DelvUI elements properly.
+
 # 1.6.1.0
 - Added a new "Occlusion Type" setting for Nameplates:
     + This lets you control which kind of objects in the world will cover nameplates.
