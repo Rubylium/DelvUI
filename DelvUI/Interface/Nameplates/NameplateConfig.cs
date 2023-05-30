@@ -515,6 +515,14 @@ namespace DelvUI.Interface.GeneralElements
         [Order(3)]
         public bool DisableInteraction = false;
 
+        [Checkbox("Use Different Size when targeted", spacing = true)]
+        [Order(31)]
+        public bool UseDifferentSizeWhenTargeted = false;
+
+        [DragInt2("Size When Targeted", min = 1, max = 4000)]
+        [Order(32, collapseWith = nameof(UseDifferentSizeWhenTargeted))]
+        public Vector2 SizeWhenTargeted;
+
         [ColorEdit4("Targeted Border Color")]
         [Order(38, collapseWith = nameof(DrawBorder))]
         public PluginConfigColor TargetedBorderColor = PluginConfigColor.FromHex(0xFFFFFFFF);
@@ -563,6 +571,11 @@ namespace DelvUI.Interface.GeneralElements
             return Enabled && (!OnlyShowWhenNotFull || hp < maxHp) && !(HideHealthAtZero && hp <= 0);
         }
 
+        public Vector2 GetSize(bool targeted)
+        {
+            return targeted && UseDifferentSizeWhenTargeted ? SizeWhenTargeted : Size;
+        }
+
         public NameplateBarConfig() : base(Vector2.Zero, Vector2.Zero, new(Vector4.Zero)) { } // don't remove
     }
 
@@ -601,12 +614,20 @@ namespace DelvUI.Interface.GeneralElements
         public PluginConfigColor OutOfCombatColor = PluginConfigColor.FromHex(0xFFDA9D2E);
 
         [ColorEdit4("Out of Combat (Hostile)")]
-        [Order(46, collapseWith = nameof(UseStateColor))]
+        [Order(47, collapseWith = nameof(UseStateColor))]
         public PluginConfigColor OutOfCombatHostileColor = PluginConfigColor.FromHex(0xFF994B35);
 
         [ColorEdit4("In Combat")]
-        [Order(46, collapseWith = nameof(UseStateColor))]
+        [Order(48, collapseWith = nameof(UseStateColor))]
         public PluginConfigColor InCombatColor = PluginConfigColor.FromHex(0xFF993535);
+
+        [Checkbox("Use Custom Color when being targeted", spacing = true, help = "This will change the color of the bar when the enemy is targeting the player.")]
+        [Order(49)]
+        public bool UseCustomColorWhenBeingTargeted = false;
+
+        [ColorEdit4("Custom Color when being targeted")]
+        [Order(50, collapseWith = nameof(UseCustomColorWhenBeingTargeted))]
+        public PluginConfigColor CustomColorWhenBeingTargeted = PluginConfigColor.FromHex(0xFFC4216D);
 
         [NestedConfig("Order Label", 132)]
         public DefaultFontLabelConfig OrderLabelConfig = new DefaultFontLabelConfig(new Vector2(5, 0), "", DrawAnchor.Right, DrawAnchor.Left)
@@ -722,6 +743,11 @@ namespace DelvUI.Interface.GeneralElements
             {
                 bar.FillColor = PluginConfigColor.FromHex(bgColor);
                 bar.BackgroundColor = PluginConfigColor.FromHex(0xAA000000);
+            }
+
+            if (barConfig is NameplateBarConfig nameplateBar)
+            {
+                nameplateBar.SizeWhenTargeted = nameplateBar.Size;
             }
 
             EditableLabelConfig nameLabelConfig = new EditableLabelConfig(new Vector2(0, -20), "[name]", DrawAnchor.Top, DrawAnchor.Bottom)

@@ -1,6 +1,5 @@
 ﻿using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
-using Dalamud.Logging;
 using DelvUI.Config;
 using DelvUI.Helpers;
 using DelvUI.Interface.GeneralElements;
@@ -9,8 +8,6 @@ using FFXIVClientStructs.FFXIV.Client.Graphics;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Client.System.Framework;
 using FFXIVClientStructs.FFXIV.Common.Component.BGCollision;
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using StructsCharacter = FFXIVClientStructs.FFXIV.Client.Game.Character.Character;
 
@@ -67,7 +64,7 @@ namespace DelvUI.Interface.Nameplates
             if (!_config.Enabled || NameplatesManager.Instance == null)
             {
                 StopMouseover();
-                return; 
+                return;
             }
 
             GameObject? mouseoveredActor = null;
@@ -129,16 +126,17 @@ namespace DelvUI.Interface.Nameplates
 
                     if (data.GameObject is Character character)
                     {
+                        StructsCharacter* chara = (StructsCharacter*)character.Address;
 
-                        if ((character.StatusFlags & (StatusFlags)0x20) != 0) // StatusFlags.PartyMember is wrong
+                        if ((chara->StatusFlags2 & 0x8) != 0) // PartyMember
                         {
                             return _partyMemberHud;
                         }
-                        else if ((character.StatusFlags & (StatusFlags)0x40) != 0) // StatusFlags.AllianceMember is wrong
+                        else if ((chara->StatusFlags2 & 0x10) != 0) // AllianceMember
                         {
                             return _allianceMemberHud;
                         }
-                        else if ((character.StatusFlags & (StatusFlags)0x80) != 0) // StatusFlags.Friend is wrong
+                        else if ((chara->StatusFlags2 & 0x20) != 0) // Friend
                         {
                             return _friendsHud;
                         }
@@ -197,8 +195,6 @@ namespace DelvUI.Interface.Nameplates
             else
             {
                 int obstructionCount = 0;
-                RaycastHit hit;
-
                 Vector2[] points = new Vector2[]
                 {
                     data.ScreenPosition + new Vector2(-30, 0), // left
@@ -208,9 +204,9 @@ namespace DelvUI.Interface.Nameplates
                 foreach (Vector2 point in points)
                 {
                     Ray ray = camera.ScreenPointToRay(point);
-                    collisionModule->RaycastEx(&hit, ray.Origin, ray.Direction, data.Distance, 1, flags);
-
-                    if (hit.Distance <= data.Distance * 0.95f)
+                    RaycastHit hit;
+                   
+                    if (collisionModule->RaycastEx(&hit, ray.Origin, ray.Direction, data.Distance, 1, flags))
                     {
                         obstructionCount++;
                     }

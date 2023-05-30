@@ -1,7 +1,6 @@
 ﻿using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
-using Dalamud.Logging;
 using DelvUI.Config;
 using DelvUI.Enums;
 using DelvUI.Helpers;
@@ -13,6 +12,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using Action = System.Action;
 using Character = Dalamud.Game.ClientState.Objects.Types.Character;
+using StructsCharacter = FFXIVClientStructs.FFXIV.Client.Game.Character.Character;
 
 namespace DelvUI.Interface.Nameplates
 {
@@ -107,15 +107,18 @@ namespace DelvUI.Interface.Nameplates
 
         public (bool, bool) GetMouseoverState(NameplateData data)
         {
-            if (data.GameObject is not Character character) { return (false, false);  }
+            if (data.GameObject is not Character character) { return (false, false); }
             if (!BarConfig.IsVisible(character.CurrentHp, character.MaxHp) || BarConfig.DisableInteraction)
             {
                 return (false, false);
             }
 
+            bool targeted = Plugin.TargetManager.Target?.Address == character.Address;
+            Vector2 barSize = BarConfig.GetSize(targeted);
+
             Vector2 origin = _config.Position + data.ScreenPosition;
-            Vector2 barPos = Utils.GetAnchoredPosition(origin, BarConfig.Size, BarConfig.Anchor) + BarConfig.Position;
-            var (areaStart, areaEnd) = BarConfig.MouseoverAreaConfig.GetArea(barPos, BarConfig.Size);
+            Vector2 barPos = Utils.GetAnchoredPosition(origin, barSize, BarConfig.Anchor) + BarConfig.Position;
+            var (areaStart, areaEnd) = BarConfig.MouseoverAreaConfig.GetArea(barPos, barSize);
 
             bool isHovering = ImGui.IsMouseHoveringRect(areaStart, areaEnd);
             bool ignoreMouseover = BarConfig.MouseoverAreaConfig.Enabled && BarConfig.MouseoverAreaConfig.Ignore;
@@ -148,10 +151,10 @@ namespace DelvUI.Interface.Nameplates
             );
 
             // bar
-            Rect background = new Rect(BarConfig.Position, BarConfig.Size, bgColor);
-            Rect healthFill = BarUtilities.GetFillRect(BarConfig.Position, BarConfig.Size, BarConfig.FillDirection, fillColor, currentHp, maxHp);
+            Vector2 barSize = BarConfig.GetSize(targeted);
+            Rect background = new Rect(BarConfig.Position, barSize, bgColor);
+            Rect healthFill = BarUtilities.GetFillRect(BarConfig.Position, barSize, BarConfig.FillDirection, fillColor, currentHp, maxHp);
 
-            //BarHud bar = new BarHud(BarConfig, character);
             BarHud bar = new BarHud(
                 BarConfig.ID,
                 BarConfig.DrawBorder,
@@ -161,7 +164,9 @@ namespace DelvUI.Interface.Nameplates
                 character,
                 current: currentHp,
                 max: maxHp,
-                shadowConfig: BarConfig.ShadowConfig
+                shadowConfig: BarConfig.ShadowConfig,
+                barTextureName: BarConfig.BarTextureName,
+                barTextureDrawMode: BarConfig.BarTextureDrawMode
             );
 
             bar.SetBackground(background);
@@ -180,7 +185,7 @@ namespace DelvUI.Interface.Nameplates
             // mouseover area
             BarHud? mouseoverAreaBar = BarConfig.MouseoverAreaConfig.GetBar(
                 BarConfig.Position,
-                BarConfig.Size,
+                barSize,
                 BarConfig.ID + "_mouseoverArea",
                 BarConfig.Anchor
             );
@@ -191,13 +196,13 @@ namespace DelvUI.Interface.Nameplates
             }
 
             // labels
-            Vector2 barPos = Utils.GetAnchoredPosition(origin, BarConfig.Size, BarConfig.Anchor) + BarConfig.Position;
+            Vector2 barPos = Utils.GetAnchoredPosition(origin, barSize, BarConfig.Anchor) + BarConfig.Position;
             LabelHud[] labels = GetLabels(maxHp);
             foreach (LabelHud label in labels)
             {
                 LabelConfig labelConfig = (LabelConfig)label.GetConfig();
                 float alpha = _config.RangeConfig.AlphaForDistance(data.Distance, labelConfig.Color.Vector.W);
-                var (labelText, labelPos, labelSize, labelColor) = label.PreCalculate(barPos, BarConfig.Size, data.GameObject, data.Name, currentHp, maxHp, data.Kind == ObjectKind.Player);
+                var (labelText, labelPos, labelSize, labelColor) = label.PreCalculate(barPos, barSize, data.GameObject, data.Name, currentHp, maxHp, data.Kind == ObjectKind.Player);
 
                 drawActions.Add((labelConfig.StrataLevel, () =>
                 {
@@ -225,8 +230,9 @@ namespace DelvUI.Interface.Nameplates
             if (data.GameObject is Character chara &&
                 BarConfig.IsVisible(chara.CurrentHp, chara.MaxHp))
             {
-                Vector2 pos = Utils.GetAnchoredPosition(data.ScreenPosition + BarConfig.Position, BarConfig.Size, BarConfig.Anchor);
-                Vector2 size = BarConfig.Size;
+                bool targeted = Plugin.TargetManager.Target?.Address == data.GameObject.Address;
+                Vector2 size = BarConfig.GetSize(targeted);
+                Vector2 pos = Utils.GetAnchoredPosition(data.ScreenPosition + BarConfig.Position, size, BarConfig.Anchor);
 
                 return new NameplateAnchor(pos, size);
             }
@@ -522,20 +528,29 @@ namespace DelvUI.Interface.Nameplates
             return drawActions;
         }
 
-        protected override PluginConfigColor GetFillColor(Character character, uint currentHp, uint maxHp)
+        protected override unsafe PluginConfigColor GetFillColor(Character character, uint currentHp, uint maxHp)
         {
             NameplateEnemyBarConfig config = (NameplateEnemyBarConfig)BarConfig;
 
+            bool targetingPlayer = character.TargetObjectId == Plugin.ClientState.LocalPlayer?.ObjectId;
+            if (targetingPlayer && config.UseCustomColorWhenBeingTargeted)
+            {
+                return config.CustomColorWhenBeingTargeted;
+            }
+
             if (config.UseStateColor)
             {
-                bool inCombat = (character.StatusFlags & StatusFlags.InCombat) != 0;
+                StructsCharacter* chara = (StructsCharacter*)character.Address;
+
+                bool inCombat = (chara->StatusFlags & 0x20) != 0;
                 if (inCombat && !config.ColorByHealth.Enabled)
                 {
                     return config.InCombatColor;
                 }
                 else if (!inCombat)
                 {
-                    return (character.StatusFlags & StatusFlags.Hostile) != 0 ? config.OutOfCombatHostileColor : config.OutOfCombatColor;
+                    bool isHostile = (chara->StatusFlags & 0x10) != 0;
+                    return isHostile ? config.OutOfCombatHostileColor : config.OutOfCombatColor;
                 }
             }
 
